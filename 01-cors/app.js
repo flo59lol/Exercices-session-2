@@ -10,10 +10,15 @@ const JWT_SECRET = 'cle-de-dev-ilaria-a-ne-pas-garder';
 
 const app = express();
 
-// Le front (Vite) tourne sur http://localhost:5173 et appelle cette
-// API depuis le navigateur. cors() sans option ouvre l'API à toutes
-// les origines.
-app.use(cors());
+// Seul le front (Vite) peut lire les réponses de l'API depuis
+// le navigateur.
+app.use(
+  cors({
+    origin: ['http://localhost:5173'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+  })
+);
 app.use(express.json());
 
 // Comptes pré-enregistrés (password contient le hash bcrypt)
