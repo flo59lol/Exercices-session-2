@@ -3,6 +3,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const helmet = require('helmet');
 
 // Clé de signature des jetons. En dur pour l'instant :
 // la session 4 la sortira du code (variable d'environnement).
@@ -15,6 +16,9 @@ const JWT_SECRET = 'cle-de-dev-ilaria-a-ne-pas-garder';
 const ORIGINES_AUTORISEES = ['http://localhost:5173'];
 
 const app = express();
+
+// Protège les en-têtes HTTP
+app.use(helmet());
 
 // Le front (Vite) tourne sur http://localhost:5173 et appelle cette
 // API depuis le navigateur.
