@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const helmet = require('helmet');
+const { rateLimit } = require('express-rate-limit');
 
 // Clé de signature des jetons. En dur pour l'instant :
 // la session 4 la sortira du code (variable d'environnement).
@@ -99,6 +100,17 @@ function trouverTache(req) {
 // le suivant.
 function creerApp() {
   const app = express();
+  const limiteurConnexion = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 5, // 5 tentatives
+    standardHeaders: true, // Renvoie les en-têtes RateLimit-* (définit des codes HTTP supplémentaires)
+    legacyHeaders: false, // Désactive les en-têtes X-RateLimit-* (obsolètes)
+    handler: (req, res) => {
+      res.status(429).json({ // Too Many Requests
+        error: 'Trop de tentatives, réessayez plus tard',
+      });
+    },
+  });
 
   // En premier : les en-têtes de sécurité partent ainsi sur toutes
   // les réponses, erreurs 401 et 404 comprises. Les réglages par
@@ -116,24 +128,28 @@ function creerApp() {
   );
   app.use(express.json());
 
-  app.post('/login', async (req, res) => {
-    const { email, password } = req.body || {};
-    const user = users.find((u) => u.email === email);
-    const ok =
-      user && (await bcrypt.compare(password, user.password));
-    if (!ok) {
-      return res
-        .status(401)
-        .json({ error: 'Identifiants invalides' });
+  app.post(
+    '/login',
+    limiteurConnexion, // Limite les tentatives de connexion
+    async (req, res) => {
+      const { email, password } = req.body || {};
+      const user = users.find((u) => u.email === email);
+      const ok =
+        user && (await bcrypt.compare(password, user.password));
+      if (!ok) {
+        return res
+          .status(401)
+          .json({ error: 'Identifiants invalides' });
+      }
+      // sub est une chaîne dans la norme JWT
+      const token = jwt.sign(
+        { sub: String(user.id), role: user.role },
+        JWT_SECRET,
+        { algorithm: 'HS256', expiresIn: '15m' }
+      );
+      res.json({ token });
     }
-    // sub est une chaîne dans la norme JWT
-    const token = jwt.sign(
-      { sub: String(user.id), role: user.role },
-      JWT_SECRET,
-      { algorithm: 'HS256', expiresIn: '15m' }
-    );
-    res.json({ token });
-  });
+  );
 
   app.get('/tasks', authentifier, (req, res) => {
     res.json(tasks.filter((t) => t.ownerId === req.user.id));
